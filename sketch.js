@@ -12,6 +12,7 @@ let frameId = 0, lastSampleFrame = -1, lastPoseSeenAt = -Infinity;
 let poseAvailable = false, poseLossSent = false;
 let trainingData = [], classIds = [], nextClassId = 1;
 let isTracking = false, isBusy = false, isFlipped = true;
+let badgePrediction = null;
 let trackingEpoch = 0, training;
 let bluetoothDevice = null, rxCharacteristic = null;
 let isConnected = false, isConnecting = false, isManualDisconnect = false;
@@ -100,7 +101,23 @@ function createUI() {
   new ResizeObserver(updateHeader).observe(header);
   updateHeader(); renderClasses(); updateControls();
 }
+function updateCameraBadge() {
+  let message;
+  if(modelLoadFailed)message="모델 로드 실패";
+  else if(!isModelReady)message="PoseNet 로딩 중…";
+  else if(trainingCandidate)message=cancelTraining?"모델 학습 취소 중…":"모델 학습 중…";
+  else if(!frameReady)message="카메라 영상을 기다리는 중…";
+  else if(isTracking){
+    if(!poseAvailable||performance.now()-lastPoseSeenAt>POSE_FRESH_MS)message="사람이 감지되지 않습니다";
+    else if(badgePrediction)message=badgePrediction.label+" · "+Math.round(badgePrediction.confidence*100)+"%";
+    else message="자세 인식 중…";
+  }
+  else if(classifier)message="인식 준비 완료 · 시작을 눌러주세요";
+  else message=poseAvailable?"자세 감지됨 · 샘플 수집 가능":"자세 미감지 · 샘플 수집 가능";
+  if(byId("status-badge").textContent!==message)setText("status-badge",message);
+}
 function updateControls() {
+  updateCameraBadge();
   document.querySelectorAll('.train-btn').forEach(button=>{button.disabled=isBusy||!isModelReady||!frameReady;});
   document.querySelectorAll('.delete-btn,#add-class-btn,#reset-model-btn,#import-model-btn').forEach(button=>{button.disabled=isBusy;});
   byId('download-model-btn').disabled=isBusy||!trainingData.length;
@@ -146,7 +163,7 @@ async function handlePoseResult(result) {
   lastLandmarks=result.pose?.keypoints||null;
   poseAvailable=PoseModel.hasPerson(result.pose);
   if(poseAvailable){lastPoseSeenAt=performance.now();poseLossSent=false;}
-  setText('status-badge',poseAvailable?'자세 감지됨':'자세 미감지 · 샘플 수집 가능');
+  if(!poseAvailable)badgePrediction=null;
   updateControls();
   if(isTracking&&!isBusy&&poseAvailable&&classifier) {
     const epoch=trackingEpoch,current=classifier;
@@ -158,7 +175,7 @@ async function handlePoseResult(result) {
   }
 }
 function invalidatePose() {
-  lastLandmarks=null;lastFeatures=null;frameReady=false;poseAvailable=false;
+  lastLandmarks=null;lastFeatures=null;frameReady=false;poseAvailable=false;badgePrediction=null;
   if(training)training.stop();
   if(isModelReady)setText('status-badge','카메라의 새 영상을 기다리는 중…');
   updateControls();
@@ -166,6 +183,7 @@ function invalidatePose() {
 function checkPoseFreshness() {
   if(frameReady&&performance.now()-lastFrameSeenAt>POSE_FRESH_MS)invalidatePose();
   if(isTracking&&(!poseAvailable||performance.now()-lastPoseSeenAt>POSE_FRESH_MS)) {
+    badgePrediction=null;updateCameraBadge();
     setText('result-label','자세 감지 안 됨');setText('result-conf','자세를 비추면 인식을 다시 시작합니다.');
     if(!poseLossSent&&performance.now()-lastPoseSeenAt>POSE_FRESH_MS){poseLossSent=true;sendStop(trackingEpoch);}
   }
@@ -380,13 +398,13 @@ async function importModel(file) {
 function startTracking() {
   if (isBusy || isTracking || !isModelReady || !classifier) return;
   training.stop();
-  trackingEpoch++; isTracking = true; poseLossSent = false;
+  trackingEpoch++; isTracking = true; poseLossSent = false;badgePrediction=null;updateCameraBadge();
   lastSentLabel = ""; lastSendTime = 0;
   setText("result-label", "자세 감지 대기"); setText("result-conf", "");
 }
 function stopTracking(sendStopSignal = true) {
   const active = isTracking;
-  isTracking = false;
+  isTracking = false;badgePrediction=null;updateCameraBadge();
   if (active) trackingEpoch++;
   if (active) {
     setText("result-label", "중지됨"); setText("result-conf", "");
@@ -395,6 +413,7 @@ function stopTracking(sendStopSignal = true) {
 }
 function showPrediction(result) {
   if (!result || !isTracking) return;
+  badgePrediction={label:result.label,confidence:result.confidence};updateCameraBadge();
   setText("result-label", result.label);
   setText("result-conf", "모델 예측값: " + (result.confidence * 100).toFixed(0) + "%");
   if (!isConnected) { setText("bluetooth-data-display", "전송 대기: 기기 연결 필요"); return; }

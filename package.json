@@ -13,8 +13,8 @@
   "name": "boundary-x-bodypose-recognition",
   "scripts": {
     "build:runtime": "esbuild scripts/runtime-entry.js --bundle --minify --main-fields=module,main --outfile=pose-runtime.js --legal-comments=eof",
-    "test": "node --test tests/core.cjs && node tests/browser.cjs",
-    "test:core": "node --test tests/core.cjs",
+    "test": "node --test tests/core.cjs tests/badge.cjs && node tests/browser.cjs",
+    "test:core": "node --test tests/core.cjs tests/badge.cjs",
     "test:browser": "node tests/browser.cjs"
   },
   "devDependencies": {
