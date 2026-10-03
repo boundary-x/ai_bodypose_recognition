@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>바운더리엑스 AI 몸 포즈</title>
+  <link rel="icon" href="https://raw.githubusercontent.com/boundary-x/ai_teachable_machine/refs/heads/main/Favicon.png"/>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.6.0/p5.min.js"></script>
+  <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.min.css" />
+  <link rel="stylesheet" type="text/css" href="style.css">
+  <link rel="stylesheet" href="support.css">
+</head>
+<body>
+  <header>
+    <div class="title">
+      <a href="https://boundaryx.io">
+        <img src="https://raw.githubusercontent.com/boundary-x/ai_voice_recognition/refs/heads/main/boundaryx_logo.png" alt="Logo">
+      </a>
+      <span class="title-text">AI 몸 포즈 <span class="knn-badge">KNN</span></span>
+    </div>
+    <div class="header-actions"><button class="help-button" type="button" data-help="">도움말</button><a href="https://boundaryx.io/59" class="back-button">돌아가기</a></div>
+  </header>
+
+  <main>
+    <div id="p5-container" class="canvas-container">
+      <div id="status-badge" class="status-badge camera-badge">모델 로딩 중...</div>
+    </div>
+
+    <section class="controls">
+      <div class="control-group" id="camera-card"><h3>카메라 설정</h3><p id="camera-status" role="status">카메라 연결 중…</p><div class="button-group"><button type="button" id="switch-camera" class="start-button">전후방 전환</button><button type="button" id="mirror-camera" class="start-button" aria-pressed="true">좌우 반전</button></div><button type="button" id="retry-camera" class="start-button" hidden>카메라 다시 시도</button></div>
+
+      <div class="control-group">
+        <h3>학습 ID 추가</h3>
+        <p>전신을 카메라에 비추고 ID별 학습 버튼을 누르세요. 짧게 누르면 1개, 길게 누르면 연속으로 수집합니다. 한 사람의 전신을 비추고 ID마다 서로 다른 자세를 정해주세요.</p>
+        <div class="input-group">
+          <button id="add-class-btn" class="add-button" type="button">+ 학습 ID 추가</button>
+        </div>
+
+        <div id="training-list" class="class-list class-list-container">
+          <div class="empty-msg">아직 학습된 데이터가 없습니다.</div>
+        </div>
+
+        <p id="training-status" class="status-message" role="status" aria-live="polite">ID를 추가한 뒤 전신이 감지되면 학습할 수 있습니다.</p>
+
+        <!-- Reset control is created by sketch.js. -->
+        <div id="reset-btn-container"></div>
+      </div>
+
+      <div class="control-group">
+        <h3>모델 저장 · 가져오기</h3>
+        <p>학습 데이터를 JSON 파일로 보관하거나 공유하세요. 가져오면 현재 ID와 학습 데이터를 교체합니다.</p>
+        <div class="button-group model-file-buttons">
+          <button id="download-model-btn" class="start-button" type="button" disabled>모델 다운로드</button>
+          <button id="share-model-btn" class="start-button" type="button" disabled>파일 공유</button>
+          <button id="import-model-btn" class="stop-button" type="button">모델 가져오기</button>
+        </div>
+        <input id="model-file-input" type="file" accept=".json,application/json" hidden>
+        <p id="file-status" class="status-message" role="status" aria-live="polite">원본 영상은 포함되지 않습니다. 파일 공유는 지원하는 기기에서 사용할 수 있습니다.</p>
+      </div>
+
+      <div class="control-group" id="result-card">
+        <h3>🧠 AI 판단 결과</h3>
+        <div class="data-info-box">
+          <p class="info-title"><strong>인식 결과</strong></p>
+          <div id="result-label" class="ai-result">대기 중</div>
+          <div id="result-conf" class="ai-confidence">데이터 부족</div>
+        </div>
+        <div id="bluetooth-data-display" class="data-display">전송 데이터: 대기 중...</div>
+      </div>
+
+      <div class="control-group">
+        <h3>1. 기기 연결</h3>
+        <p>블루투스 연결 버튼을 클릭해 마이크로비트를 연결해주세요.</p>
+        <div id="bluetoothStatus" class="status-box" style="margin-top: 10px;">상태: 연결 대기 중</div>
+        <!-- Bluetooth controls are created by sketch.js. -->
+        <div id="bluetooth-control-buttons" class="button-group" style="margin-top: 1.5rem;"></div>
+        <div class="support-inline"><button type="button" data-help="help-connection">연결이 안 되나요?</button></div>
+      </div>
+
+      <div class="control-group">
+        <h3>2. AI 인식 제어</h3>
+        <p>시작 버튼을 눌러 AI 인식 및 데이터 전송을 시작하세요.</p>
+        <!-- Recognition controls are created by sketch.js. -->
+        <div id="recognition-control-buttons" class="button-group"></div>
+      </div>
+
+      <details id="support-card" class="control-group"></details>
+    </section>
+  </main>
+
+  <footer>
+    <div class="footer-container">
+      <div class="footer-top">
+        <div class="footer-info">
+          <h2 class="footer-logo">바운더리엑스</h2>
+          <p class="slogan">"우리는 산업과 교육의 경계를 허물고, 미래 기술을 교실의 책상 위로 옮기는 사람들입니다"</p>
+          <address>
+            <p>경기도 의왕시 안양판교로 82(유니콘로드), 811호</p>
+            <p class="copyright">© 2024 Boundary X Co. All rights reserved.</p>
+          </address>
+        </div>
+        <div class="footer-links">
+          <div class="link-column">
+            <h4>제품 소개</h4>
+            <ul>
+              <li><a href="https://boundaryx.io/shop/?idx=25" target="_blank">AI 비트런</a><span class="link-desc">마이크로비트 기반 이족보행로봇</span></li>
+              <li><a href="https://boundaryx.io/shop/?idx=26" target="_blank">AI 포니봇</a><span class="link-desc">마이크로비트 기반 모빌리티로봇</span></li>
+            </ul>
+          </div>
+          <div class="link-column">
+            <h4>고객 지원</h4>
+            <ul>
+              <li><a href="https://boundaryx.io/contact" target="_blank">문의처</a><span class="link-desc">제품 문의 | 제휴 문의 | 연수 문의</span></li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <script src="pose-model.js"></script>
+  <script src="training-input.js"></script>
+  <script src="sketch.js"></script>
+  <script src="support.js"></script>
+</body>
+</html>
