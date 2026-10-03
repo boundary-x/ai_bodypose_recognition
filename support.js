@@ -1,56 +1,46 @@
-/* In-app help. Tours only explain the UI; they never operate training or Bluetooth. */
+/* In-app support for PoseNet feature learning. */
 (() => {
-  'use strict';
-  const $ = id => document.getElementById(id);
-  const support = $('support-card');
-  const example = 'https://makecode.microbit.org/57559-53483-63617-50743';
-  support.innerHTML = `
-    <summary><span><strong>사용 가이드 및 지원</strong><small>사용법 · 예제 코드 · 문제 해결</small></span><span class="support-chevron" aria-hidden="true">⌄</span></summary>
-    <div class="support-content">
-      <p class="support-intro">처음이라면 화면 안내부터 시작해보세요.</p>
-      <div class="support-actions">
-        <button type="button" data-tour="all" class="support-primary">사용법 둘러보기 <span aria-hidden="true">→</span></button>
-      </div>
-      <details class="support-section" id="help-examples"><summary>마이크로비트 예제 코드</summary><div class="support-answer example-codes">
-        <div class="example-code"><a href="https://makecode.microbit.org/S49771-77509-50114-72682" target="_blank" rel="noopener noreferrer">블루투스 이름 확인 코드 ↗</a><p>연결할 마이크로비트의 장치 이름을 확인합니다. 마이크로비트의 LED 매트릭스에 출력되는 이름(알파벳 소문자 5자리)을 확인한 뒤 아래 프로젝트 코드를 다운로드하세요.</p></div>
-        <div class="example-code"><a id="project-example-link" href="${example}" target="_blank" rel="noopener noreferrer">프로젝트 예제 코드 ↗</a><p><strong>조건문에 ID1을 직접 입력해 코드를 완성하세요.</strong> 다른 학습 ID도 사용하려면 해당 ID에 맞는 조건과 동작을 추가하세요.</p></div>
-        <p class="support-caption">stop을 받았을 때 기기를 멈추는 동작도 설정하세요. 다운로드하면 마이크로비트에 있던 이전 코드가 교체됩니다.</p>
-      </div></details>
-      <details class="support-section" id="help-troubleshooting"><summary>문제 해결 <span class="support-meta">증상별 안내</span></summary><div class="support-answer support-faq">
-        <details id="help-camera"><summary>카메라가 켜지지 않아요</summary><p>주소창의 사이트 권한에서 카메라 사용을 허용하세요. 다른 앱이 카메라를 사용 중이면 종료하고 다시 시도하세요. 새로고침 전에는 수집한 모델을 다운로드해두세요.</p></details>
-        <details id="help-hand"><summary>전신이 감지되지 않거나 학습 버튼이 비활성화돼요</summary><p>모델 로딩이 끝날 때까지 기다린 뒤 전신이 화면 안에 들어오도록 비춰주세요. 밝은 곳에서 몸과 배경을 구분하면 도움이 됩니다. ‘전신 감지됨’ 상태에서 ID별 학습 버튼을 사용할 수 있습니다.</p></details>
-        <details id="help-connection"><summary>블루투스 연결이 안 되거나 기기가 움직이지 않아요</summary><p>마이크로비트 전원과 예제 코드 다운로드 여부를 확인하세요. 다른 브라우저나 앱에 연결되어 있다면 연결을 해제하세요. 기기 선택 창이 열리지 않으면 사용 중인 브라우저의 Web Bluetooth 지원 여부를 확인하세요.</p><p>앱 아래의 ‘전송됨’ 표시와 예제 코드의 수신 문자열을 비교하세요. ID1과 id1은 다릅니다. stop에 대한 정지 동작도 코드에 있어야 합니다.</p></details>
-        <details id="help-accuracy"><summary>다른 몸 자세로 인식돼요</summary><p>구분하기 쉬운 몸 자세부터 시작하세요. 학습하지 않은 자세도 가장 가까운 ID로 분류되므로 대기 자세도 별도 ID로 학습하세요. 투표 비율은 정확도 보장이 아닙니다. 각 ID에 비슷한 개수의 샘플을 모으고, 몸 위치와 거리를 조금씩 바꾸어 수집하세요. 현재 학습 방식은 몸의 회전이나 좌우 자세를 자동으로 같은 동작으로 처리하지 않습니다.</p></details>
-        <details id="help-files"><summary>가져오기나 파일 공유가 안 돼요</summary><p>이 몸 포즈 앱에서 다운로드한 JSON 파일을 사용하세요. 핸드 포즈와 이미지 분류 앱의 모델은 가져올 수 없습니다. 파일 공유를 지원하지 않는 환경에서는 모델 다운로드를 사용하고 저장한 파일을 직접 첨부하세요.</p></details>
-      </div></details>
-      <details class="support-section" id="help-updates"><summary>업데이트 노트 <span class="support-meta">최근 변경</span></summary><div class="support-answer">
-        <p class="support-release">몸 포즈 KNN 첫 배포</p><ul><li>화면 하이라이트 안내와 예제 코드 바로가기</li><li>앱 안에서 확인하는 문제 해결 및 업데이트 노트</li></ul>
-        <p class="support-release">현재 버전의 주요 개선</p><ul><li>ID1부터 자동으로 추가되는 학습 ID</li><li>짧게 눌러 1개 수집, 길게 눌러 연속 수집</li><li>모델 다운로드 · 파일 공유 · 가져오기</li><li>모바일 레이아웃과 이미지 분류 앱의 디자인 통일</li><li>전신이 0.5초 동안 감지되지 않으면 stop 전송</li></ul>
-      </div></details>
-      <details class="support-section"><summary>수업 자료</summary><div class="support-answer"><p>몸 포즈 분류 수업 자료는 준비 중입니다.</p></div></details>
-    </div>`;
-
-  const tours = {
-    learn: [
-      ['#p5-container', '전신을 카메라에 비춰주세요', '카메라 권한을 허용하고 모델 로딩을 기다리세요. 전신이 보이면 관절 표시와 ‘전신 감지됨’ 상태가 나타납니다.'],
-      ['#add-class-btn', '학습 ID를 추가하세요', '이 버튼을 누르면 ID1부터 자동으로 만들어집니다. ID마다 서로 다른 몸 자세을 정해주세요.'],
-      ['#training-list', '짧게 누르거나 길게 누르세요', 'ID별 ‘학습하기’를 짧게 누르면 샘플 1개, 길게 누르면 연속으로 수집합니다. 어깨부터 발목까지 관절이 감지될 때 사용할 수 있습니다.'],
-      ['#add-class-btn', '다른 몸 자세도 학습하세요', 'ID2를 추가해 다른 몸 자세을 수집하세요. 각 ID에 비슷한 개수의 샘플을 모으면 비교하기 좋습니다.'],
-      ['#recognition-control-buttons', '인식을 시작하세요', '학습한 뒤 ‘인식 시작’을 누르세요. 마이크로비트가 연결되지 않아도 화면에서 인식 결과를 확인할 수 있습니다.'],
-      ['#result-card .data-info-box', '결과를 확인하세요', '몸 자세을 바꾸면서 ID와 KNN 투표 비율를 확인하세요. 전신이 사라지면 인식을 멈추고, 다시 비추면 자동으로 이어집니다.']
-    ],
-    files: [
-      ['#download-model-btn', '학습한 모델을 보관하세요', '모델 다운로드로 ID와 몸 관절 좌표 학습 데이터를 JSON 파일에 저장합니다. 원본 카메라 영상은 포함되지 않습니다.'],
-      ['#share-model-btn', '파일을 공유하세요', '지원하는 기기에서는 공유 창에서 앱을 선택할 수 있습니다. 공유가 지원되지 않으면 다운로드한 파일을 직접 첨부하세요.'],
-      ['#import-model-btn', '이어서 학습하세요', '이 몸 포즈 앱에서 저장한 JSON을 선택하세요. 가져오면 현재 ID와 데이터가 교체되므로 필요한 모델은 먼저 저장하세요.']
-    ],
-    device: [
-      ['#project-example-link', '프로젝트 예제를 완성하세요', '지원 카드에서 이름 확인 코드와 프로젝트 예제를 열 수 있습니다. 프로젝트 조건문에 ID1을 직접 입력하고 원하는 동작을 넣은 뒤 다운로드하세요.'],
-      ['#bluetooth-control-buttons', '마이크로비트를 연결하세요', '전원을 켠 뒤 ‘기기 연결’에서 내 장치를 선택하세요. 예제의 블루투스 페어링 설정을 확인하고, 연결이 어렵다면 ‘연결이 안 되나요?’를 참고하세요.'],
-      ['#recognition-control-buttons', '인식 결과를 전송하세요', '학습한 뒤 ‘인식 시작’을 누르면 인식한 ID가 전송됩니다. ‘인식 중지’를 누르면 stop을 전송합니다.'],
-      ['#bluetooth-data-display', '실제 전송 상태를 확인하세요', '이 영역에서 전송 성공 여부를 확인하세요. 전신이 0.5초 동안 사라져도 stop을 전송하며, 기기 코드에서 이를 처리해야 멈춥니다.']
-    ]
-  };
+ 'use strict';
+ const $=id=>document.getElementById(id),support=$('support-card');
+ support.innerHTML=`
+ <summary><span><strong>사용 가이드 및 지원</strong><small>사용법 · 예제 코드 · 문제 해결</small></span><span class="support-chevron" aria-hidden="true">⌄</span></summary>
+ <div class="support-content">
+ <p class="support-intro">나만의 자세를 학습하고 인식한 ID로 기기를 제어해보세요.</p>
+ <div class="support-actions"><button type="button" data-tour="all" class="support-primary">사용법 둘러보기 <span aria-hidden="true">→</span></button></div>
+ <details class="support-section" id="help-examples"><summary>마이크로비트 예제 코드</summary><div class="support-answer example-codes">
+ <div class="example-code"><a href="https://makecode.microbit.org/S49771-77509-50114-72682" target="_blank" rel="noopener noreferrer">블루투스 이름 확인 코드 ↗</a><p>연결할 마이크로비트의 장치 이름을 확인합니다. 마이크로비트의 LED 매트릭스에 출력되는 이름(알파벳 소문자 5자리)을 확인한 뒤 아래 프로젝트 코드를 다운로드하세요.</p></div>
+ <div class="example-code"><a id="project-example-link" href="https://makecode.microbit.org/57559-53483-63617-50743" target="_blank" rel="noopener noreferrer">프로젝트 예제 코드 ↗</a><p><strong>조건문에 ID1을 직접 입력해 코드를 완성하세요.</strong> 다른 ID의 동작과 stop을 받았을 때 멈추는 동작도 설정하세요.</p></div></div></details>
+ <details class="support-section" id="help-troubleshooting"><summary>문제 해결 <span class="support-meta">증상별 안내</span></summary><div class="support-answer support-faq">
+ <details id="help-camera"><summary>카메라가 켜지지 않아요</summary><p>사이트의 카메라 권한을 허용하고 다른 카메라 앱을 종료하세요. 오류 안내에 따라 다시 시도하세요. 새로고침 전에는 수집한 데이터를 저장해주세요.</p></details>
+ <details id="help-hand"><summary>상체만 보여도 학습할 수 있나요?</summary><p>네. 모든 관절이 보일 필요는 없습니다. 샘플은 PoseNet의 히트맵과 위치 보정값으로 저장합니다. 한 사람을 비추고 실제 사용할 거리와 화면 구도에서 수집하세요. 관절이 표시되지 않아도 수집은 가능하지만, 인식 중 자세를 감지하지 못하면 ID 대신 stop을 전송합니다.</p></details>
+ <details id="help-training"><summary>모델 학습이나 인식 시작 버튼이 비활성화돼요</summary><p>최소 2개 ID에 각각 10개 이상 수집하면 모델을 학습할 수 있습니다. 빈 ID는 삭제하거나 샘플을 추가해주세요. 샘플 수집 후 모델 학습을 누르고 완료될 때까지 화면을 열어두세요. ID나 샘플이 바뀌면 다시 학습해야 인식을 시작할 수 있습니다.</p></details>
+ <details id="help-accuracy"><summary>다른 자세로 인식돼요</summary><p>ID마다 비슷한 개수로 여러 샘플을 모으세요. 같은 자세를 조금 다른 거리와 위치에서도 수집하고, 구분하려는 팔·몸 부분은 잘 보이게 해주세요. 학습하지 않은 자세도 가까운 클래스로 예측될 수 있으므로 대기 자세를 별도 ID로 학습하는 것이 좋습니다. 모델 예측값은 실제 정확도를 보장하지 않습니다.</p></details>
+ <details id="help-connection"><summary>블루투스 연결이 안 되거나 기기가 움직이지 않아요</summary><p>마이크로비트 전원과 UART 예제 코드를 확인하세요. 다른 앱과의 연결을 해제하고 Web Bluetooth를 지원하는 브라우저에서 연결하세요. 아이폰은 Bluefy 등 지원 브라우저가 필요합니다.</p><p>모델 학습 후 인식 시작을 눌러야 ID가 전송됩니다. 대소문자를 구분하며 줄바꿈으로 끝납니다. 자세 미감지가 약 0.5초 이어지거나 인식을 중지하면 stop을 보냅니다. 기기 코드에서도 stop을 처리해주세요.</p></details>
+ <details id="help-files"><summary>저장하거나 가져올 수 없어요</summary><p>이 앱의 버전 2 JSON 파일을 사용하세요. 수집한 샘플과 학습된 분류 모델이 함께 저장됩니다. 학습 전 샘플만 저장한 파일은 가져온 뒤 모델 학습이 필요합니다. 이전 KNN 파일은 특징 데이터가 달라 변환할 수 없으므로 새로 수집해주세요. Teachable Machine 사이트의 내보내기 파일을 직접 가져오는 기능은 지원하지 않습니다.</p><p>파일은 최대 64MiB이며 원본 영상은 포함하지 않습니다. 파일 공유를 지원하지 않으면 다운로드를 사용하세요. 새로고침하면 저장하지 않은 데이터는 사라집니다.</p></details>
+ </div></details>
+ <details class="support-section"><summary>수업 자료</summary><div class="support-answer"><p>몸 포즈 분류 수업 자료는 준비 중입니다.</p></div></details>
+ <details class="support-section" id="help-updates"><summary>업데이트 노트 <span class="support-meta">최근 변경</span></summary><div class="support-answer"><p class="support-release">PoseNet 기반 신경망 포즈 분류</p><ul><li>Teachable Machine 공식 포즈 라이브러리 적용</li><li>전신 필수 조건 제거, 상체·부분 포즈 샘플 수집</li><li>샘플 수집과 모델 학습 단계 분리</li><li>학습 진행률 · 취소 · 학습된 모델 저장 및 복원</li></ul></div></details>
+ </div>`;
+ const tours={
+ learn:[
+ ['#p5-container','학습할 자세를 비춰주세요','상체만 보여도 됩니다. 모든 관절이 보일 필요는 없습니다. 한 사람을 비추고 실제 사용할 화면 구도에서 샘플을 모아주세요.'],
+ ['#add-class-btn','ID별로 자세를 정하세요','ID1부터 자동으로 추가됩니다. 삭제한 번호는 다시 사용할 수 있으며, 다른 ID는 바뀌지 않습니다.'],
+ ['#training-list','샘플을 수집하세요','짧게 누르면 1개, 길게 누르면 연속으로 수집합니다. 최소 2개 ID에 각각 10개 이상 모아주세요. ID당 100개, 전체 500개까지 수집할 수 있습니다.'],
+ ['#model-training-card','모델을 학습하세요','샘플 수집이 끝났으면 모델 학습을 누르세요. 완료될 때까지 화면을 열어두세요. 학습 취소를 눌러도 샘플은 유지됩니다.'],
+ ['#recognition-control-buttons','인식을 시작하세요','모델 학습이 완료되면 인식 시작을 누르세요. 마이크로비트를 연결하지 않아도 결과를 확인할 수 있습니다.'],
+ ['#result-card .data-info-box','자세를 바꾸며 확인하세요','ID와 모델 예측값을 확인하세요. 예측값은 정확도 보장이 아닙니다. 샘플이나 ID를 변경했다면 모델을 다시 학습하세요.']
+ ],
+ device:[
+ ['#project-example-link','프로젝트 예제를 완성하세요','블루투스 이름 확인 후 프로젝트 조건문에 ID1을 입력하고 원하는 동작을 넣어 다운로드하세요. stop을 받았을 때 멈추는 동작도 설정하세요.'],
+ ['#bluetooth-control-buttons','마이크로비트를 연결하세요','기기 연결에서 내 장치를 선택하세요. 다른 앱이 연결되어 있다면 먼저 해제해주세요.'],
+ ['#recognition-control-buttons','인식 결과를 전송하세요','인식 시작을 누르면 감지한 자세의 ID가 전송됩니다. 자세 미감지가 약 0.5초 이어지면 stop이 전송됩니다.'],
+ ['#bluetooth-data-display','전송 상태를 확인하세요','전송됨 표시는 블루투스 쓰기의 완료를 뜻합니다. 기기가 움직이려면 수신 코드의 ID 조건과 일치해야 합니다.']
+ ],
+ files:[
+ ['#download-model-btn','샘플과 모델을 보관하세요','JSON 파일에는 수집한 특징 데이터와 학습된 분류 모델이 저장됩니다. 원본 영상은 포함되지 않습니다. 새로고침 전에는 다운로드해주세요.'],
+ ['#share-model-btn','파일을 공유하세요','지원하는 기기에서는 공유 창에서 앱을 선택하세요. 지원하지 않으면 다운로드로 저장합니다.'],
+ ['#import-model-btn','저장한 모델을 가져오세요','이 앱에서 내보낸 버전 2 JSON을 선택하세요. 학습된 모델은 바로 인식을 시작할 수 있고, 샘플만 저장한 파일은 모델 학습이 필요합니다.']
+ ]};
   const allSteps = [...tours.learn, ...tours.device, ...tours.files];
   const chapters = [{label:'학습', start:0}, {label:'기기 연결', start:tours.learn.length}, {label:'저장·가져오기', start:tours.learn.length + tours.device.length}];
   const dialog = document.createElement('dialog');
@@ -87,7 +77,7 @@
     $('guide-description').textContent = description;
     if (selector === '#training-list' && !target.querySelector('.train-btn')) {
       $('guide-title').textContent = 'ID별 학습 버튼이 표시될 자리예요';
-      $('guide-description').textContent = 'ID를 추가하면 이곳에 ‘학습하기’ 버튼이 나타납니다. 전신이 감지될 때 짧게 눌러 1개, 길게 눌러 연속 수집할 수 있습니다.';
+      $('guide-description').textContent = 'ID를 추가하면 이곳에 ‘샘플 수집’ 버튼이 나타납니다. 모든 관절이 보일 필요 없이 짧게 눌러 1개, 길게 눌러 연속 수집할 수 있습니다.';
     }
     $('guide-prev').disabled = index === 0;
     $('guide-next').textContent = index === steps.length - 1 ? '안내 마치기' : '다음';

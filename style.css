@@ -70,7 +70,7 @@ header {
   transition: height 0.3s ease;
 }
 
-.title > a { display: flex; flex: 0 1 auto; min-width: 0; }
+.title > a { display: flex; flex: 0 0 auto; min-width: 0; }
 .title-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* KNN Badge Style */
@@ -761,3 +761,6 @@ button:focus-visible, a:focus-visible { outline: 3px solid #3778d4; outline-offs
  .canvas-container{width:100%!important;height:auto!important;aspect-ratio:4/3;max-height:none!important;position:sticky!important;top:calc(var(--header-height) + 8px)!important;z-index:20}
  main{align-items:stretch!important}
 }
+
+#model-progress {width:100%; height:12px; margin-top:18px; accent-color:#111}
+

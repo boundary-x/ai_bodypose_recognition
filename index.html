@@ -6,6 +6,8 @@
   <title>바운더리엑스 AI 몸 포즈</title>
   <link rel="icon" href="https://raw.githubusercontent.com/boundary-x/ai_teachable_machine/refs/heads/main/Favicon.png"/>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.6.0/p5.min.js"></script>
+  <script src="pose-runtime.js"></script>
+  
   <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.min.css" />
   <link rel="stylesheet" type="text/css" href="style.css">
   <link rel="stylesheet" href="support.css">
@@ -16,7 +18,7 @@
       <a href="https://boundaryx.io">
         <img src="https://raw.githubusercontent.com/boundary-x/ai_voice_recognition/refs/heads/main/boundaryx_logo.png" alt="Logo">
       </a>
-      <span class="title-text">AI 몸 포즈 <span class="knn-badge">KNN</span></span>
+      <span class="title-text">AI 몸 포즈 <span class="knn-badge">V2</span></span>
     </div>
     <div class="header-actions"><button class="help-button" type="button" data-help="">도움말</button><a href="https://boundaryx.io/59" class="back-button">돌아가기</a></div>
   </header>
@@ -31,7 +33,7 @@
 
       <div class="control-group">
         <h3>학습 ID 추가</h3>
-        <p>전신을 카메라에 비추고 ID별 학습 버튼을 누르세요. 짧게 누르면 1개, 길게 누르면 연속으로 수집합니다. 한 사람의 전신을 비추고 ID마다 서로 다른 자세를 정해주세요.</p>
+        <p>ID마다 다른 자세를 정하고 샘플을 수집하세요. 상체만 보여도 됩니다. 짧게 누르면 1개, 길게 누르면 연속 수집합니다. 최소 2개 ID에 각각 10개 이상 모아주세요.</p>
         <div class="input-group">
           <button id="add-class-btn" class="add-button" type="button">+ 학습 ID 추가</button>
         </div>
@@ -40,15 +42,21 @@
           <div class="empty-msg">아직 학습된 데이터가 없습니다.</div>
         </div>
 
-        <p id="training-status" class="status-message" role="status" aria-live="polite">ID를 추가한 뒤 전신이 감지되면 학습할 수 있습니다.</p>
+        <p id="training-status" class="status-message" role="status" aria-live="polite">ID를 추가하고 학습할 자세를 비춰주세요. 모든 관절이 보일 필요는 없습니다.</p>
 
         <!-- Reset control is created by sketch.js. -->
         <div id="reset-btn-container"></div>
       </div>
 
+      <div class="control-group" id="model-training-card">
+        <h3>모델 학습</h3><p>샘플 수집이 끝나면 모델을 학습하세요. 학습 중에는 이 화면을 열어두세요.</p>
+        <div class="button-group"><button id="train-model-btn" class="start-button" type="button" disabled>모델 학습</button><button id="cancel-training-btn" class="stop-button" type="button" hidden>학습 취소</button></div>
+        <progress id="model-progress" max="30" value="0" aria-label="모델 학습 진행률"></progress>
+        <p id="model-status" class="status-message" role="status">최소 2개 ID에 각각 10개 이상 수집하면 학습할 수 있습니다.</p>
+      </div>
       <div class="control-group">
         <h3>모델 저장 · 가져오기</h3>
-        <p>학습 데이터를 JSON 파일로 보관하거나 공유하세요. 가져오면 현재 ID와 학습 데이터를 교체합니다.</p>
+        <p>샘플과 학습된 모델을 JSON 파일로 보관하거나 공유하세요. 가져오면 현재 ID와 학습 데이터를 교체합니다.</p>
         <div class="button-group model-file-buttons">
           <button id="download-model-btn" class="start-button" type="button" disabled>모델 다운로드</button>
           <button id="share-model-btn" class="start-button" type="button" disabled>파일 공유</button>
@@ -120,7 +128,10 @@
 
   <script src="pose-model.js"></script>
   <script src="training-input.js"></script>
+  <script src="pose-classifier.js"></script>
   <script src="sketch.js"></script>
   <script src="support.js"></script>
 </body>
 </html>
+
+
