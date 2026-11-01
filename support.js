@@ -5,7 +5,7 @@
  support.innerHTML=`
  <summary><span><strong>사용 가이드 및 지원</strong><small>사용법 · 예제 코드 · 문제 해결</small></span><span class="support-chevron" aria-hidden="true">⌄</span></summary>
  <div class="support-content">
- <p class="support-intro">나만의 자세를 학습하고 인식한 ID로 기기를 제어해보세요.</p>
+ <p class="support-intro">나만의 자세를 학습하고 인식한 ID로 기기를 제어해보세요. 블루투스 연결 없이 인식하고 전송할 데이터를 먼저 확인할 수 있습니다. 기기를 연결하면 실제 데이터를 전송합니다.</p>
  <div class="support-actions"><button type="button" data-tour="all" class="support-primary">사용법 둘러보기 <span aria-hidden="true">→</span></button></div>
  <details class="support-section" id="help-examples"><summary>마이크로비트 예제 코드</summary><div class="support-answer example-codes">
  <div class="example-code"><a href="https://makecode.microbit.org/S49771-77509-50114-72682" target="_blank" rel="noopener noreferrer">블루투스 이름 확인 코드 ↗</a><p>연결할 마이크로비트의 장치 이름을 확인합니다. 마이크로비트의 LED 매트릭스에 출력되는 이름(알파벳 소문자 5자리)을 확인한 뒤 아래 프로젝트 코드를 다운로드하세요.</p></div>
@@ -151,4 +151,6 @@
   window.addEventListener('scroll', reposition, {passive:true});
   if (location.hash === '#support-card') requestAnimationFrame(() => openHelp());
 })();
+
+
 
