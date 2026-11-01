@@ -416,7 +416,7 @@ function showPrediction(result) {
   badgePrediction={label:result.label,confidence:result.confidence};updateCameraBadge();
   setText("result-label", result.label);
   setText("result-conf", "모델 예측값: " + (result.confidence * 100).toFixed(0) + "%");
-  if (!isConnected) { setText("bluetooth-data-display", "전송 대기: 기기 연결 필요"); return; }
+  if (!isConnected) { setText("bluetooth-data-display", "전송할 데이터: " + result.label); return; }
   if (!predictionSendPending &&
       (result.label !== lastSentLabel || Date.now() - lastSendTime > SEND_INTERVAL)) {
     predictionSendPending = true;
@@ -438,7 +438,7 @@ function queueSend(data, epoch, attempts = 1) {
   const operation = sendQueue.then(async () => {
     if (data !== "stop" && (epoch !== trackingEpoch || !isTracking || !poseAvailable || performance.now()-lastPoseSeenAt>POSE_FRESH_MS)) return false;
     if (!isConnected || !target || target !== rxCharacteristic) {
-      if (epoch === trackingEpoch) setText("bluetooth-data-display", "전송 대기: 기기 연결 필요");
+      if (epoch === trackingEpoch) setText("bluetooth-data-display", "전송할 데이터: " + data);
       return false;
     }
     for (let i = 0; i < attempts; i++) {
@@ -516,6 +516,8 @@ function drawLandmarks(points) {
   for(const [a,b]of edges)if(visible(points[a])&&visible(points[b]))line(x(points[a]),points[a].position.y,x(points[b]),points[b].position.y);
   noStroke();fill(0,255,160);for(const p of points)if(visible(p))ellipse(x(p),p.position.y,8,8);
 }
+
+
 
 
 
