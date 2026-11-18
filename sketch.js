@@ -1,4 +1,4 @@
-/* Boundary X — official Teachable Machine PoseNet features + neural classifier. */
+/* Boundary X — MediaPipe Lite + landmark KNN local prototype. */
 const UART_SERVICE_UUID = "6e400001-b5a3-f393-e0a9-e50e24dcca9e";
 const UART_RX_UUID = "6e400003-b5a3-f393-e0a9-e50e24dcca9e";
 const SEND_INTERVAL = 100;
@@ -25,8 +25,18 @@ const trainingStatus = message => setText("training-status", message);
 
 let facingMode='user', cameraBusy=false, lastInferenceAt=0;
 let frameCanvas, frameContext;
+const faceSurprise=FaceSurprise.create();
+function currentFaceGeometry(){
+  if(!frameReady||performance.now()-lastFrameSeenAt>POSE_FRESH_MS)return null;
+  return FaceSurprise.geometry(lastLandmarks,width,height,isFlipped);
+}
 function setup() {
-  createCanvas(640,480).parent('p5-container');
+  const preview=createCanvas(640,480);preview.parent('p5-container');
+  preview.elt.addEventListener('click',event=>{
+    const rect=preview.elt.getBoundingClientRect();if(!rect.width||!rect.height)return;
+    faceSurprise.tap(currentFaceGeometry(),(event.clientX-rect.left)*width/rect.width,(event.clientY-rect.top)*height/rect.height);
+  });
+  preview.elt.style.touchAction='manipulation';
   pixelDensity(1); frameRate(30);
   video={elt:document.createElement('video')};
   video.elt.muted=true; video.elt.playsInline=true;
@@ -69,10 +79,11 @@ function captureFrame() {
 function createUI() {
   training = TrainingInput.createController({
     collect: collectSample,
-    onStart: () => { if (isTracking) stopTracking(); }
+    onStart: () => { if (isTracking) stopTracking(); },
+    onChange: renderCapture
   });
-  byId("train-model-btn").addEventListener("click", trainModel);
-  byId("cancel-training-btn").addEventListener("click", cancelModelTraining);
+  byId("capture-cancel").onclick=()=>training.stop();
+
   byId("add-class-btn").addEventListener("click", addClass);
   byId("download-model-btn").addEventListener("click", downloadModel);
   byId("share-model-btn").addEventListener("click", shareModel);
@@ -91,9 +102,11 @@ function createUI() {
   button("start-track-btn", "인식 시작", "recognition-control-buttons", startTracking);
   button("stop-track-btn", "인식 중지", "recognition-control-buttons", () => stopTracking(), "stop-button");
   const suspend = () => {
-    training.stop(); stopTracking(); runtimeEpoch++; invalidatePose(); cancelModelTraining();
+    training.stop('background'); stopTracking(); runtimeEpoch++; invalidatePose(); cancelModelTraining();
   };
-  window.addEventListener("blur", suspend);
+  // A screenshot tool or another visible window should not cancel collection.
+  // Stop robot output on focus loss, but cancel collection only when hidden.
+  window.addEventListener("blur", () => stopTracking());
   window.addEventListener("pagehide", suspend);
   document.addEventListener("visibilitychange", () => { if (document.hidden) suspend(); });
   const header = document.querySelector("header");
@@ -104,42 +117,33 @@ function createUI() {
 function updateCameraBadge() {
   let message;
   if(modelLoadFailed)message="모델 로드 실패";
-  else if(!isModelReady)message="PoseNet 로딩 중…";
-  else if(trainingCandidate)message=cancelTraining?"모델 학습 취소 중…":"모델 학습 중…";
+  else if(!isModelReady)message="포즈 모델 로딩 중…";
+  else if(training?.active)message=training.state.id+" · "+(training.state.phase==='countdown'?"자세 준비 중":"샘플 수집 중");
   else if(!frameReady)message="카메라 영상을 기다리는 중…";
   else if(isTracking){
     if(!poseAvailable||performance.now()-lastPoseSeenAt>POSE_FRESH_MS)message="사람이 감지되지 않습니다";
     else if(badgePrediction)message=badgePrediction.label+" · "+Math.round(badgePrediction.confidence*100)+"%";
-    else message="자세 인식 중…";
+    else message="일치하는 자세 확인 중…";
   }
   else if(classifier)message="인식 준비 완료 · 시작을 눌러주세요";
-  else message=poseAvailable?"자세 감지됨 · 샘플 수집 가능":"자세 미감지 · 샘플 수집 가능";
+  else message=poseAvailable?"자세 감지됨 · 샘플 수집 가능":"얼굴과 양쪽 어깨가 보이도록 자세를 비춰주세요";
   if(byId("status-badge").textContent!==message)setText("status-badge",message);
 }
 function updateControls() {
   updateCameraBadge();
-  document.querySelectorAll('.train-btn').forEach(button=>{button.disabled=isBusy||!isModelReady||!frameReady;});
-  document.querySelectorAll('.delete-btn,#add-class-btn,#reset-model-btn,#import-model-btn').forEach(button=>{button.disabled=isBusy;});
-  byId('download-model-btn').disabled=isBusy||!trainingData.length;
-  byId('share-model-btn').disabled=isBusy||!trainingData.length;
-  byId('start-track-btn').disabled=isBusy||!isModelReady||!classifier;
-  byId('train-model-btn').disabled=isBusy||!isModelReady||!PoseModel.trainable(classIds,trainingData);
-  byId('cancel-training-btn').hidden=!trainingCandidate;
-  byId('switch-camera').disabled=isBusy||cameraBusy;
+  document.querySelectorAll('.train-btn').forEach(button=>{button.disabled=isBusy||!isModelReady||!frameReady||training?.active||(PoseModel.counts(trainingData)[button.dataset.id]||0)>90||trainingData.length>490;});
+  document.querySelectorAll('.delete-btn,#add-class-btn,#reset-model-btn,#import-model-btn').forEach(button=>{button.disabled=isBusy||training?.active;});
+  byId('download-model-btn').disabled=isBusy||!trainingData.length||training?.active;
+  byId('share-model-btn').disabled=isBusy||!trainingData.length||training?.active;
+  byId('start-track-btn').disabled=isBusy||!isModelReady||!classifier||training?.active;
+
+  byId('switch-camera').disabled=isBusy||cameraBusy||training?.active;
   byId('connect-btn').disabled=isConnecting||isConnected;
   byId('connect-btn').textContent=isConnected?'연결됨':isConnecting?'연결 중...':'기기 연결';
 }
 async function initPoseNet() {
-  try {
-    setText('status-badge','PoseNet 로딩 중…');
-    if(typeof tf==='undefined'||typeof tmPose==='undefined')throw new Error('AI 라이브러리를 다운로드하지 못했습니다.');
-    await tf.ready();
-    poseExtractor=await tmPose.createTeachable({labels:[],modelSettings:PoseModel.SETTINGS});
-    isModelReady=true; setText('status-badge','학습할 자세를 비춰주세요'); updateControls(); inferenceLoop();
-  } catch(error){
-    console.error(error); modelLoadFailed=true; isModelReady=false;
-    setText('status-badge','모델 로드 실패'); trainingStatus('모델 로드 실패: '+error.message+' 인터넷 연결을 확인하고 새로고침해주세요.');updateControls();
-  }
+ try {setText('status-badge','포즈 모델 로딩 중…');poseExtractor=await loadPoseLandmarker();isModelReady=true;updateControls();inferenceLoop();}
+ catch(error){console.error(error);modelLoadFailed=true;trainingStatus('포즈 모델을 불러오지 못했습니다. 인터넷 연결을 확인하고 새로고침해주세요.');updateControls();}
 }
 async function inferenceLoop() {
   if(isModelReady&&video&&!isBusy&&!cameraBusy&&!document.hidden) {
@@ -148,7 +152,7 @@ async function inferenceLoop() {
       lastVideoTime=input.currentTime;lastInferenceAt=performance.now();
       const epoch=runtimeEpoch;inferenceBusy=true;
       try {
-        const result=await poseExtractor.estimatePose(frameCanvas);
+        const result=poseExtractor.detectForVideo(frameCanvas,performance.now());
         if(epoch===runtimeEpoch&&!isBusy&&!document.hidden)await handlePoseResult(result);
       }catch(error){console.error(error);invalidatePose();}
       finally{inferenceBusy=false;}
@@ -157,26 +161,20 @@ async function inferenceLoop() {
   requestAnimationFrame(inferenceLoop);
 }
 async function handlePoseResult(result) {
-  const features=result?.posenetOutput;
-  if(!PoseModel.validFeatures(features)){invalidatePose();return;}
-  frameId++;lastFeatures=features;lastFrameSeenAt=performance.now();frameReady=true;
-  lastLandmarks=result.pose?.keypoints||null;
-  poseAvailable=PoseModel.hasPerson(result.pose);
-  if(poseAvailable){lastPoseSeenAt=performance.now();poseLossSent=false;}
-  if(!poseAvailable)badgePrediction=null;
-  updateControls();
-  if(isTracking&&!isBusy&&poseAvailable&&classifier) {
-    const epoch=trackingEpoch,current=classifier;
-    const probabilities=await current.predict(features);
-    if(epoch!==trackingEpoch||current!==classifier||!isTracking||performance.now()-lastPoseSeenAt>POSE_FRESH_MS)return;
-    const best=probabilities.reduce((a,b)=>a.probability>=b.probability?a:b);
-    if(!Number.isFinite(best.probability))throw new Error('분류 결과가 유효하지 않습니다. 모델을 다시 학습해주세요.');
-    showPrediction({label:best.className,confidence:best.probability});
-  }
+ frameId++;lastFrameSeenAt=performance.now();frameReady=true;
+ lastLandmarks=result.landmarks?.[0]||null;lastFeatures=PoseModel.extract(lastLandmarks);poseAvailable=!!lastFeatures;
+ if(poseAvailable){lastPoseSeenAt=performance.now();poseLossSent=false;}
+ if(!poseAvailable)badgePrediction=null;
+ updateControls();
+ if(isTracking&&!isBusy&&poseAvailable&&classifier){
+   const best=PoseModel.predict(lastFeatures,trainingData);
+   if(best)showPrediction(best);
+   else{badgePrediction=null;setText('result-label','일치하는 자세 없음');setText('result-conf','학습한 자세를 비춰주세요.');updateCameraBadge();if(lastSentLabel!=='stop')sendStop(trackingEpoch);}
+ }
 }
 function invalidatePose() {
   lastLandmarks=null;lastFeatures=null;frameReady=false;poseAvailable=false;badgePrediction=null;
-  if(training)training.stop();
+  // Keep batch alive while frames are temporarily unavailable.
   if(isModelReady)setText('status-badge','카메라의 새 영상을 기다리는 중…');
   updateControls();
 }
@@ -188,40 +186,26 @@ function checkPoseFreshness() {
     if(!poseLossSent&&performance.now()-lastPoseSeenAt>POSE_FRESH_MS){poseLossSent=true;sendStop(trackingEpoch);}
   }
 }
-function invalidateClassifier() {
-  stopTracking();
-  PoseClassifier.dispose(classifier);classifier=null;classifierWeights=null;
-  setText('model-status','샘플을 모은 뒤 모델 학습을 눌러주세요. ID나 샘플을 변경하면 다시 학습해야 합니다.');
-  byId('model-progress').value=0;
+function invalidateClassifier(){
+ stopTracking();classifier=Object.values(PoseModel.counts(trainingData)).some(n=>n>=10)?true:null;
+ setText('model-status',classifier?'샘플 준비 완료 · 별도 모델 학습 없이 인식을 시작할 수 있습니다.':'ID에 샘플 10개를 모으면 바로 인식할 수 있습니다.');
 }
-function cancelModelTraining(){if(trainingCandidate){cancelTraining=true;trainingCandidate.model.stopTraining=true;setText('model-status','학습을 취소하는 중…');}}
-async function trainModel() {
-  if(isBusy||!isModelReady||!PoseModel.trainable(classIds,trainingData))return;
-  stopForChange();runtimeEpoch++;isBusy=true;cancelTraining=false;updateControls();
-  let candidate=null;
-  try {
-    while(inferenceBusy)await new Promise(resolve=>setTimeout(resolve,20));
-    candidate=PoseClassifier.create(poseExtractor,classIds);trainingCandidate=candidate;candidate.setLabels([...classIds]);
-    for(const sample of trainingData)await candidate.addExample(classIds.indexOf(sample.label),sample.features);
-    // The official trainer replaces its initial empty Sequential model.
-    candidate.model.dispose();
-    byId('model-progress').value=0;updateControls();setText('model-status','모델 학습 중… 화면을 열어두세요.');
-    await candidate.train({denseUnits:100,epochs:30,learningRate:0.0001,batchSize:16},{
-      onBatchEnd:async()=>{if(cancelTraining)candidate.model.stopTraining=true;await tf.nextFrame();},
-      onEpochEnd:async(epoch)=>{byId('model-progress').value=epoch+1;setText('model-status','모델 학습 중 · '+(epoch+1)+' / 30');if(cancelTraining)candidate.model.stopTraining=true;await tf.nextFrame();}
-    });
-    if(cancelTraining){setText('model-status','학습을 취소했습니다. 수집한 샘플은 유지됩니다.');return;}
-    const weights=await PoseClassifier.pack(candidate);
-    if(cancelTraining){setText('model-status','학습을 취소했습니다. 수집한 샘플은 유지됩니다.');return;}
-    // Materialize an inference-only model from the exact weights used by export/import.
-    // The training graph and its optimizer/backend caches are never reused for live inference.
-    const inferenceModel=PoseClassifier.restore(poseExtractor,classIds,PoseModel.decodeFloats(weights,PoseModel.weightCount(classIds.length)));
-    PoseClassifier.dispose(classifier);classifier=inferenceModel;classifierWeights=weights;
-    setText('model-status','학습 완료 · 인식 시작을 눌러주세요.');
-    setText('result-label','모델 준비됨');setText('result-conf','인식 시작을 눌러주세요.');
-  }catch(error){console.error(error);setText('model-status','학습 실패: '+error.message+' 샘플은 유지됩니다. 다시 시도해주세요.');}
-  finally{PoseClassifier.dispose(candidate);trainingCandidate=null;isBusy=false;lastVideoTime=-1;updateControls();}
+function cancelModelTraining(){}
+let captureHideTimer=null;
+function renderCapture(state){
+ clearTimeout(captureHideTimer);
+ const active=['countdown','collecting','paused'].includes(state.phase),overlay=byId('capture-overlay');
+ overlay.hidden=!active&&state.phase==='idle';overlay.dataset.phase=state.phase;
+ byId('capture-cancel').hidden=!active;
+ setText('capture-id',(state.id||'')+' 포즈 학습');
+ const message=state.phase==='countdown'?'카메라에서 자세를 잡아주세요':state.phase==='paused'?'얼굴과 양쪽 어깨가 보이도록 해주세요 · 자동으로 이어집니다':state.phase==='done'?'10개 수집 완료! 다른 자세도 추가해보세요':state.phase==='timeout'?'수집 시간이 지났습니다. 자세를 확인한 뒤 다시 눌러주세요.':state.phase==='limit'?'저장할 수 있는 샘플 수에 도달했습니다.':state.phase==='background'?'화면을 벗어나 수집을 중단했습니다. 모은 샘플은 유지됩니다.':state.phase==='cancelled'?'수집을 취소했습니다. 모은 샘플은 유지됩니다.':'자세를 유지해주세요';
+ setText('capture-number',state.phase==='countdown'?state.seconds:state.count+' / 10');
+ setText('capture-message',message);setText('capture-caption',state.phase==='countdown'?'초 후 자동 수집':state.phase==='done'?'수집 완료':state.phase==='paused'?'자세 확인 중':'샘플');
+ byId('capture-progress').value=state.count;
+ trainingStatus((state.id||'')+' · '+message);updateControls();
+ if(!active){invalidateClassifier();updateControls();captureHideTimer=setTimeout(()=>{if(!training.active)overlay.hidden=true;},5000);}
 }
+
 function draw() {
   background(0);
   push();
@@ -233,6 +217,7 @@ function draw() {
   pop();
   if (training) checkPoseFreshness();
   if (lastLandmarks) drawLandmarks(lastLandmarks);
+  faceSurprise.draw(drawingContext,currentFaceGeometry());
 }
 function syncNextClassId() {
   const used = new Set(classIds);
@@ -267,8 +252,8 @@ function renderClasses() {
     const row = document.createElement("div"); row.className = "list-item train-btn-row"; row.dataset.id = id;
     const button = document.createElement("button");
     button.type = "button"; button.className = "train-btn"; button.dataset.id = id;
-    button.setAttribute("aria-label", id + " 학습: 짧게 누르면 1개, 길게 누르면 연속 수집");
-    for (const [name, text] of [["id-badge", id], ["train-text", "샘플 수집"], ["badge-count train-count", (counts[id] || 0) + "개"]]) {
+    button.setAttribute("aria-label", id + " 학습하기: 5초 후 샘플 10개 자동 수집");
+    for (const [name, text] of [["id-badge", id], ["train-text", "학습하기 · 10개"], ["badge-count train-count", (counts[id] || 0) + "개"]]) {
       const span = document.createElement("span"); span.className = name; span.textContent = text;
       button.appendChild(span);
     }
@@ -282,18 +267,18 @@ function renderClasses() {
 }
 function collectSample(id) {
   if (isBusy || !isModelReady || !classIds.includes(id)) return false;
-  if (!frameReady || !lastFeatures || performance.now() - lastFrameSeenAt > POSE_FRESH_MS) {
-    trainingStatus("자세를 카메라에 비춘 뒤 다시 눌러주세요."); return false;
+  if (!frameReady || !poseAvailable || !lastFeatures || performance.now() - lastFrameSeenAt > POSE_FRESH_MS) {
+    return false;
   }
   if (isTracking) stopTracking();
   if (lastSampleFrame === frameId) return null;
   const count = PoseModel.counts(trainingData)[id] || 0;
   if (count >= PoseModel.MAX_PER_CLASS || trainingData.length >= PoseModel.MAX_SAMPLES) {
-    trainingStatus("ID당 100개, 전체 500개까지 수집할 수 있습니다."); return false;
+    trainingStatus("ID당 100개, 전체 500개까지 수집할 수 있습니다."); return "limit";
   }
-  invalidateClassifier();
   trainingData.push({label: id, features: new Float32Array(lastFeatures)});
   lastSampleFrame = frameId;
+  invalidateClassifier();
   const badge = document.querySelector('.train-btn[data-id="' + id + '"] .badge-count');
   if (badge) badge.textContent = (count + 1) + "개";
   trainingStatus(id + " · " + (count + 1) + "개 수집됨");
@@ -311,6 +296,7 @@ function deleteClass(id) {
   invalidateClassifier();
   trainingData = trainingData.filter(sample => sample.label !== id);
   classIds = classIds.filter(label => label !== id);
+  invalidateClassifier();
   syncNextClassId();
   if (!classIds.length) {
     lastSampleFrame = -1;
@@ -327,7 +313,7 @@ function clearAllModel() {
   if (!confirm("모든 ID와 학습 데이터를 초기화할까요?")) return;
   stopForChange();
   invalidateClassifier();
-  trainingData = []; classIds = []; nextClassId = 1; lastSampleFrame = -1;
+  trainingData = []; classIds = []; nextClassId = 1; lastSampleFrame = -1;invalidateClassifier();
   renderClasses(); updateControls();
   setText("result-label", "대기 중"); setText("result-conf", "데이터 없음");
   trainingStatus("초기화했습니다. ID1부터 추가할 수 있습니다.");
@@ -369,31 +355,15 @@ async function shareModel() {
       : "파일 공유에 실패했습니다. 모델 다운로드로 저장한 뒤 첨부해주세요.");
   } finally { isBusy = false; updateControls(); }
 }
-async function importModel(file) {
-  if(!file||isBusy)return;
-  isBusy=true;stopForChange();runtimeEpoch++;updateControls();let restored=null;
-  try {
-    if(file.size>PoseModel.MAX_BYTES)throw new Error('64MiB 이하의 JSON 파일을 선택해주세요.');
-    const project=PoseModel.parse(await file.text());
-    if(classIds.length&&!confirm('가져오면 현재 ID와 학습 데이터를 교체합니다. 계속할까요?')){fileStatus('가져오기를 취소했습니다. 기존 데이터는 유지됩니다.');return;}
-    if(project.weights){
-      if(!isModelReady)throw new Error('PoseNet 로딩이 완료된 뒤 모델을 가져와주세요.');
-      restored=PoseClassifier.restore(poseExtractor,project.classIds,project.weights);
-      const prediction=await restored.predict(project.samples[0].features);
-      if(prediction.some(p=>!Number.isFinite(p.probability)))throw new Error('모델 가중치를 검증하지 못했습니다.');
-    }
-    const packed=project.weights?PoseModel.encodeFloats(project.weights):null;
-    invalidateClassifier();classifier=restored;restored=null;classifierWeights=packed;
-    trainingData=project.samples;classIds=[...project.classIds];syncNextClassId();
-    // Keep the stored output label order; renderClasses sorts only a copy for display.
-    isFlipped=project.settings.isFlipped;byId('mirror-camera').setAttribute('aria-pressed',String(isFlipped));lastSampleFrame=-1;
-    renderClasses();setText('result-label',classifier?'모델 준비됨':'샘플 가져옴');setText('result-conf',classifier?'인식 시작을 눌러주세요.':'모델 학습을 눌러주세요.');
-    setText('model-status',classifier?'학습된 모델을 복원했습니다. 인식 시작을 눌러주세요.':'샘플을 복원했습니다. 모델 학습을 눌러주세요.');
-    byId('model-progress').value=classifier?30:0;
-    trainingStatus('샘플을 가져왔습니다. 추가 수집 후에는 모델을 다시 학습해주세요.');
-    fileStatus(classIds.length+'개 ID · '+trainingData.length+'개 샘플'+(classifier?' · 학습된 모델 복원 완료':' · 모델 학습 필요'));
-  }catch(error){fileStatus('가져오기 실패: '+error.message);}
-  finally{PoseClassifier.dispose(restored);byId('model-file-input').value='';isBusy=false;updateControls();}
+async function importModel(file){
+ if(!file||isBusy)return;training.stop();stopTracking();isBusy=true;updateControls();
+ try{
+   if(file.size>PoseModel.MAX_BYTES)throw Error('4MiB 이하의 파일을 선택해주세요.');
+   const project=PoseModel.parse(await file.text());
+   if(classIds.length&&!confirm('현재 ID와 샘플을 가져온 데이터로 교체할까요?'))return;
+   trainingData=project.samples;classIds=project.classIds;isFlipped=project.settings.isFlipped;lastSampleFrame=-1;
+   byId('mirror-camera').setAttribute('aria-pressed',String(isFlipped));invalidateClassifier();renderClasses();fileStatus(classIds.length+'개 ID · '+trainingData.length+'개 샘플 가져오기 완료');
+ }catch(error){fileStatus('가져오기 실패: '+error.message);}finally{isBusy=false;byId('model-file-input').value='';updateControls();}
 }
 function startTracking() {
   if (isBusy || isTracking || !isModelReady || !classifier) return;
@@ -415,7 +385,7 @@ function showPrediction(result) {
   if (!result || !isTracking) return;
   badgePrediction={label:result.label,confidence:result.confidence};updateCameraBadge();
   setText("result-label", result.label);
-  setText("result-conf", "모델 예측값: " + (result.confidence * 100).toFixed(0) + "%");
+  setText("result-conf", "이웃 샘플 일치 비율: " + (result.confidence * 100).toFixed(0) + "%");
   if (!isConnected) { setText("bluetooth-data-display", "전송할 데이터: " + result.label); return; }
   if (!predictionSendPending &&
       (result.label !== lastSentLabel || Date.now() - lastSendTime > SEND_INTERVAL)) {
@@ -509,12 +479,26 @@ function updateBluetoothStatusUI() {
   byId("bluetoothStatus").classList.toggle("status-connected", isConnected);
 }
 function drawLandmarks(points) {
-  const edges=[[5,6],[5,7],[7,9],[6,8],[8,10],[5,11],[6,12],[11,12],[11,13],[13,15],[12,14],[14,16]];
+  const edges=[[11,12],[11,13],[13,15],[12,14],[14,16],[11,23],[12,24],[23,24],[23,25],[25,27],[24,26],[26,28]];
+  points=points.map(p=>({score:p.visibility,position:{x:p.x*width,y:p.y*height}}));
   const visible=p=>p&&p.score>=0.3&&Number.isFinite(p.position.x)&&Number.isFinite(p.position.y);
   const x=p=>isFlipped?width-p.position.x:p.position.x;
-  stroke(0,220,130);strokeWeight(3);
-  for(const [a,b]of edges)if(visible(points[a])&&visible(points[b]))line(x(points[a]),points[a].position.y,x(points[b]),points[b].position.y);
-  noStroke();fill(0,255,160);for(const p of points)if(visible(p))ellipse(x(p),p.position.y,8,8);
+  push();
+  // Two-pass strokes remain visible on both light walls and dark clothing.
+  // Canvas coordinates, mirrored position and detection thresholds are unchanged.
+  for(const [color,weight] of [[[12,20,28,230],9],[[65,255,178,255],5]]){
+    stroke(...color);strokeWeight(weight);
+    for(const [a,b]of edges)if(visible(points[a])&&visible(points[b]))line(x(points[a]),points[a].position.y,x(points[b]),points[b].position.y);
+  }
+  for(let i=0;i<points.length;i++){
+    const p=points[i];if(!visible(p))continue;
+    const wrist=i===15||i===16,body=i>=11;
+    const size=wrist?17:body?13:8;
+    stroke(12,20,28,240);strokeWeight(body?3:2);
+    if(wrist)fill(255,211,77);else fill(90,255,191);
+    ellipse(x(p),p.position.y,size,size);
+  }
+  pop();
 }
 
 

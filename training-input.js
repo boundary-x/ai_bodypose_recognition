@@ -1,58 +1,26 @@
-/* One tap = one sample; hold = repeated samples. No synthetic-click duplicates. */
-(function (root) {
-  "use strict";
-  function createController({ collect, onStart = () => {}, onStop = () => {}, delay = 350, interval = 200 }) {
-    let active = null;
-    function stop() {
-      if (!active) return;
-      const old = active;
-      active = null;
-      clearTimeout(old.timer);
-      old.button.classList.remove("is-training");
-      if (old.button.hasPointerCapture(old.pointerId)) old.button.releasePointerCapture(old.pointerId);
-      onStop();
-    }
-    function repeat(state) {
-      if (active !== state) return;
-      state.holding = true;
-      state.button.classList.add("is-training");
-      // null means no newer hand result yet: skip this tick without ending the hold.
-      if (collect(state.id) === false) { stop(); return; }
-      state.timer = setTimeout(() => repeat(state), interval);
-    }
-    function bind(button, id) {
-      button.addEventListener("pointerdown", event => {
-        if (button.disabled || active || event.isPrimary === false || event.button !== 0) return;
-        const state = { button, id, pointerId: event.pointerId, holding: false, x: event.clientX, y: event.clientY };
-        active = state;
-        button.setPointerCapture(event.pointerId);
-        onStart();
-        state.timer = setTimeout(() => repeat(state), delay);
-      });
-      button.addEventListener("pointermove", event => {
-        if (!active || active.button !== button || active.pointerId !== event.pointerId) return;
-        const rect = button.getBoundingClientRect();
-        if (event.clientX < rect.left || event.clientX > rect.right ||
-            event.clientY < rect.top || event.clientY > rect.bottom ||
-            (!active.holding && Math.hypot(event.clientX - active.x, event.clientY - active.y) > 12)) stop();
-      });
-      button.addEventListener("pointerup", event => {
-        if (!active || active.button !== button || active.pointerId !== event.pointerId) return;
-        const tap = !active.holding;
-        stop();
-        if (tap) collect(id);
-      });
-      for (const name of ["pointercancel", "lostpointercapture"]) {
-        button.addEventListener(name, () => { if (active && active.button === button) stop(); });
-      }
-      button.addEventListener("click", event => {
-        // Keyboard/assistive activation only; pointer taps were handled on pointerup.
-        if (event.detail === 0 && !button.disabled && !active) collect(id);
-      });
-      button.addEventListener("contextmenu", event => event.preventDefault());
-    }
-    return { bind, stop };
-  }
-  root.TrainingInput = { createController };
-  if (typeof module !== "undefined" && module.exports) module.exports = root.TrainingInput;
-})(typeof globalThis !== "undefined" ? globalThis : window);
+/* A click starts one finite batch. Valid frames only; never collect in background. */
+(function(root){
+ function createController({collect,onStart,onChange,now=()=>performance.now(),schedule=setTimeout,unschedule=clearTimeout}){
+   let timer=null,state={phase:'idle',id:null,count:0},deadline=0,next=0,expires=0;
+   const emit=()=>onChange?.({...state});
+   function stop(reason='cancelled'){unschedule(timer);timer=null;if(!['countdown','collecting','paused'].includes(state.phase))return;state={...state,phase:reason};emit();}
+   function tick(){
+     if(!['countdown','collecting','paused'].includes(state.phase))return;
+     const t=now();
+     if(t<deadline){const seconds=Math.ceil((deadline-t)/1000);if(seconds!==state.seconds){state.seconds=seconds;emit();}}
+     else if(t>=expires){stop('timeout');return;}
+     else if(t>=next){
+       const success=collect(state.id);
+       if(success===true){state.count++;state.phase='collecting';next=t+500;}
+       else if(success==='limit'){stop('limit');return;}
+       else {state.phase='paused';next=t+100;}
+       if(state.count===10){state.phase='done';timer=null;emit();return;}
+       emit();
+     }
+     timer=schedule(tick,100);
+   }
+   function start(id){stop();state={phase:'countdown',id,count:0,seconds:5};deadline=now()+5000;expires=deadline+60000;next=deadline;onStart?.();emit();timer=schedule(tick,100);}
+   return {start,stop,bind(button,id){button.addEventListener('click',()=>start(id));},get active(){return ['countdown','collecting','paused'].includes(state.phase)},get state(){return {...state}}};
+ }
+ const api={createController};root.TrainingInput=api;if(typeof module!=='undefined')module.exports=api;
+})(globalThis);

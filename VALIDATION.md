@@ -1,20 +1,16 @@
-# Validation
+# Validation — v2.0.0
 
-Validated on 2026-10-03 with Node.js 24 and headless Microsoft Edge on Windows.
+Validated with Node.js and headless Microsoft Edge on Windows.
 
-- Five core groups pass: fixed PoseNet feature validation, partial-pose presence, float32 encoding, minimum sample/class requirements, and project validation.
-- Real bundled PoseNet loads and extracts 14,739 heatmap/offset features from a synthetic camera.
-- Partial upper-body fixtures can be collected with tap/hold. Duplicate frames are rejected. Training needs two classes with at least ten samples each.
-- Official Teachable Machine training completes for two distinct synthetic feature classes and distinguishes both classes.
-- Direct Dense/ReLU/Softmax inference matches an independently constructed TensorFlow CPU model within 1e-5.
-- Export/import through the actual file input preserves prediction scores. Malformed and legacy KNN files do not replace current data.
-- Training cancellation preserves samples and the previous model. Adding samples invalidates the old classifier. Deleted IDs can be reused.
-- Mocked BLE writes include recognized IDs and stop after person loss. Camera-independent collection is not blocked by a whole-body requirement.
-- Desktop, tablet, portrait and landscape viewports retain a 4:3 preview without page overflow. All 13 tour steps complete.
-- No page JavaScript exceptions occurred.
+- Real pinned MediaPipe Lite runtime/model initialized in the browser.
+- Deterministic landmarks exercise full/partial upper-body, single-arm and face-plus-shoulders inputs; absent shoulders and insufficient landmarks are rejected.
+- Normalization, visibility masks, ambiguous-match rejection and JSON round-trip tests pass.
+- A five-second countdown precedes collection; missing landmarks pause it; exactly ten successful fresh samples finish a batch. Cancellation and timeout stop additional collection.
+- Browser fixtures confirm 10-sample collection, live KNN preview without Bluetooth, cancellation and mobile overflow checks.
+- A 320px viewport keeps `10 / 10` on one line with a single progress bar.
+- Face-only taps unlock the display decoration at 20; mirror handling and missing-face guards pass.
+- Existing micro:bit and ESP32 transport adapter and payload formats are preserved.
 
-The final inference head directly evaluates saved weights because the tested WebGL single-row classifier predictions differed from serialized-weight predictions. Tests verify the direct calculation against TensorFlow CPU, rather than assuming GPU and saved models agree. PoseNet and model training retain TensorFlow acceleration.
+Browser pose fixtures test control flow, not real-world recognition accuracy. Human-pose acceptance was reviewed interactively by the user. This release does not claim measured frame-rate improvements, mobile battery benchmarks or new physical Bluetooth validation. Inference remains capped at 10Hz; skeleton latency optimization is deferred.
 
-Run npm run test:core and npm run test:browser. PLAYWRIGHT_PATH can select an installed Playwright package; BROWSER_CHANNEL defaults to msedge. Tests use synthetic camera/pose data and mocked Bluetooth.
-
-Real pose accuracy, iPhone/Bluefy camera behavior, Android training speed, and physical micro:bit reception still require hands-on testing. Synthetic two-class separation is not a measured real-world accuracy claim.
+Run `npm test` and `npm run test:browser`. `PLAYWRIGHT_PATH` can select an existing Playwright installation, and `BROWSER_CHANNEL` defaults to `msedge`.

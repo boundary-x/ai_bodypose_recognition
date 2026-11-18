@@ -1,0 +1,35 @@
+#capture-overlay[hidden]{display:none!important}
+#capture-overlay{position:absolute;z-index:12;left:50%;bottom:18px;transform:translateX(-50%);width:min(90%,430px);box-sizing:border-box;background:rgba(15,20,27,.94);color:#fff;padding:18px 22px;border:2px solid #f8d24a;border-radius:22px;text-align:center;box-shadow:0 8px 30px #0004;pointer-events:none}
+.capture-top{display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:16px}
+#capture-cancel{pointer-events:auto;background:transparent;color:#fff;border:1px solid #ffffff70;border-radius:20px;padding:8px 14px;min-height:44px;font-size:14px;cursor:pointer}
+#capture-number{font-size:clamp(36px,7vw,60px);font-weight:800;line-height:1.15;font-variant-numeric:tabular-nums;margin:4px 0}
+#capture-caption{font-size:14px;color:#dedee3}
+#capture-progress{width:100%;height:8px;margin:12px 0 6px;accent-color:#f8d24a}
+#capture-message{font-size:14px;line-height:1.45;margin:0;color:white}
+#capture-overlay[data-phase=done]{border-color:#58e5a7}
+#capture-overlay[data-phase=done] #capture-number{color:#58e5a7}
+#capture-overlay[data-phase=paused]{border-color:#ffae65}
+#capture-overlay[data-phase=countdown] #capture-progress{display:none}
+#capture-overlay[data-phase=cancelled],#capture-overlay[data-phase=timeout]{border-color:#a8afba}
+#capture-overlay{display:grid;grid-template-columns:max-content minmax(0,1fr);grid-template-areas:'top top' 'number caption' 'number progress' 'message message';column-gap:10px;padding:10px 16px;background:rgba(15,20,27,.82)}
+.capture-top{grid-area:top;min-width:0}
+#capture-id{white-space:nowrap;font-size:14px}
+#capture-cancel{width:auto!important;min-width:0!important;flex:0 0 auto!important;margin:0!important;font-size:12px!important;line-height:1.2!important}
+#capture-number{grid-area:number;font-size:34px;margin:0;align-self:center}
+#capture-caption{grid-area:caption;text-align:left;align-self:end}
+#capture-progress{grid-area:progress;margin:4px 0 8px}
+#capture-message{grid-area:message}
+#capture-overlay[data-phase=countdown] #capture-number{font-size:48px}
+#capture-overlay[data-phase=countdown] #capture-caption{align-self:center}
+@media(max-width:600px){#capture-overlay{bottom:10px;padding:10px 14px;border-radius:16px;width:94%}.capture-top{font-size:14px}#capture-number{font-size:36px}#capture-message{font-size:12px}#capture-progress{margin:6px 0 4px}#capture-cancel{padding:4px 10px}}
+
+.device-prepare,.device-example-card{padding:20px;border:1px solid #d7dbe0;border-radius:16px;margin-top:16px;background:#fff}.device-prepare{background:#f1f3f5}.device-prepare a{display:block;margin-top:12px}.device-example-heading{display:flex;justify-content:space-between;gap:10px;align-items:center}.device-example-heading h4{margin:0}.device-example-heading span{font-size:12px;background:#f1f3f5;padding:6px;border-radius:6px}.device-example-links a{display:block;background:#111;color:#fff!important;text-align:center;padding:16px;border-radius:14px;text-decoration:none}.device-example-links+p{margin-top:20px!important}
+
+/* Camera recovery action occupies its own row on all screen sizes. */
+#camera-card .camera-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;align-items:stretch}
+#camera-card .camera-actions>button{width:100%!important;min-width:0!important;margin:0!important;min-height:48px;box-sizing:border-box}
+#camera-card #retry-camera{grid-column:1 / -1}
+
+#capture-number{white-space:nowrap;font-size:clamp(26px,5vw,34px);min-width:5ch;letter-spacing:-.02em}
+#capture-overlay[data-phase=countdown] #capture-number{min-width:2ch}
+#capture-overlay[data-phase=done] #capture-progress{accent-color:#58e5a7}

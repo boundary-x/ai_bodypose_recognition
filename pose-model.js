@@ -1,63 +1,52 @@
-/* Teachable Machine PoseNet project format. No arbitrary model topology is loaded. */
+/* MediaPipe Lite + masked landmark KNN. No TensorFlow dependency. */
 (function(root){
-  'use strict';
-  const MAX_CLASSES=20, MAX_PER_CLASS=100, MAX_SAMPLES=500, MIN_SAMPLES=10;
-  const MAX_BYTES=64*1024*1024, FEATURES=17*17*51, DENSE_UNITS=100;
-  const ENGINE=Object.freeze({library:'@teachablemachine/pose',version:'0.8.6',tfjs:'4.22.0',architecture:'MobileNetV1',multiplier:0.75,inputResolution:257,outputStride:16,features:FEATURES,preprocessing:'heatmap-offset-concat-v1',classifier:'dense100-relu-dropout0.5-softmax',mirror:'display-only'});
-  const SETTINGS={posenet:{architecture:ENGINE.architecture,multiplier:ENGINE.multiplier,inputResolution:257,outputStride:16}};
-  const check=(value,message)=>{if(!value)throw new Error(message);};
-  function validFeatures(v){
-    if(!(Array.isArray(v)||v instanceof Float32Array)||v.length!==FEATURES)return false;
-    for(let i=0;i<v.length;i++){
-      if(!Number.isFinite(v[i])||Math.abs(v[i])>10000)return false;
-      if(i%51<17&&(v[i]<0||v[i]>1))return false;
-    }
-    return true;
-  }
-  // Presence affects hardware output only. It never requires the whole skeleton.
-  function hasPerson(pose){return !!(pose&&Array.isArray(pose.keypoints)&&pose.keypoints.filter(p=>p.score>=0.3&&Number.isFinite(p.position?.x)&&Number.isFinite(p.position?.y)).length>=3);}
-  function counts(data){const c=Object.create(null);for(const s of data)c[s.label]=(c[s.label]||0)+1;return c;}
-  function trainable(ids,data){const c=counts(data);return ids.length>=2&&ids.every(id=>(c[id]||0)>=MIN_SAMPLES);}
-  function encodeFloats(values){
-    const bytes=new Uint8Array(values.length*4),view=new DataView(bytes.buffer);
-    for(let i=0;i<values.length;i++)view.setFloat32(i*4,values[i],true);
-    let binary='';for(let i=0;i<bytes.length;i+=8192)binary+=String.fromCharCode(...bytes.subarray(i,i+8192));
-    return btoa(binary);
-  }
-  function decodeFloats(text,count){
-    check(typeof text==='string'&&text.length===4*Math.ceil(count*4/3)&&/^[A-Za-z0-9+/]*={0,2}$/.test(text),'저장 데이터의 길이나 인코딩이 올바르지 않습니다.');
-    const binary=atob(text);check(binary.length===count*4,'저장 데이터 길이가 올바르지 않습니다.');
-    const bytes=Uint8Array.from(binary,c=>c.charCodeAt(0)),view=new DataView(bytes.buffer),out=new Float32Array(count);
-    for(let i=0;i<count;i++){out[i]=view.getFloat32(i*4,true);check(Number.isFinite(out[i]),'유효하지 않은 숫자 데이터가 있습니다.');}
-    return out;
-  }
-  function weightCount(classes){return FEATURES*DENSE_UNITS+DENSE_UNITS+DENSE_UNITS*classes;}
-  function serialize(ids,data,flipped,weights=null){
-    return {format:'boundary-x-bodypose-tm',version:2,createdAt:new Date().toISOString(),engine:{...ENGINE},settings:{isFlipped:flipped},classIds:[...ids],samples:data.map(s=>({label:s.label,features:encodeFloats(s.features)})),classifier:weights?{labels:[...ids],weights}:null};
-  }
-  function parse(text){
-    check(typeof text==='string'&&text.length<=MAX_BYTES,'64MiB 이하의 파일을 선택해주세요.');
-    let p;try{p=JSON.parse(text);}catch(_){throw new Error('JSON 파일을 읽을 수 없습니다.');}
-    if(p?.format==='boundary-x-bodypose-knn')throw new Error('이전 KNN 모델은 특징 데이터가 달라 사용할 수 없습니다. 새 방식으로 샘플을 수집해주세요.');
-    check(p?.format==='boundary-x-bodypose-tm'&&p.version===2,'이 앱에서 저장한 포즈 모델 JSON(버전 2)을 선택해주세요.');
-    check(p.engine&&Object.keys(ENGINE).every(k=>p.engine[k]===ENGINE[k]),'모델의 특징 추출 방식이 현재 앱과 다릅니다.');
-    check(typeof p.settings?.isFlipped==='boolean','화면 설정이 올바르지 않습니다.');
-    check(Array.isArray(p.classIds)&&p.classIds.length>0&&p.classIds.length<=MAX_CLASSES,'ID 목록이 올바르지 않습니다.');
-    const ids=new Set();for(const id of p.classIds){check(typeof id==='string'&&/^ID[1-9]\d*$/.test(id)&&Number.isSafeInteger(Number(id.slice(2)))&&!ids.has(id),'중복되거나 잘못된 ID입니다.');ids.add(id);}
-    check(Array.isArray(p.samples)&&p.samples.length>0&&p.samples.length<=MAX_SAMPLES,'샘플 수가 올바르지 않습니다.');
-    const totals=new Map(),samples=p.samples.map(s=>{
-      check(s&&ids.has(s.label),'존재하지 않는 ID의 샘플입니다.');
-      const n=(totals.get(s.label)||0)+1;check(n<=MAX_PER_CLASS,'ID당 최대 100개까지 저장할 수 있습니다.');totals.set(s.label,n);
-      const features=decodeFloats(s.features,FEATURES);check(validFeatures(features),'PoseNet 특징 데이터가 손상되었습니다.');return {label:s.label,features};
-    });
-    let weights=null;
-    if(p.classifier!==null){
-      check(p.classifier&&Array.isArray(p.classifier.labels)&&p.classifier.labels.length===p.classIds.length&&p.classifier.labels.every((id,i)=>id===p.classIds[i])&&trainable(p.classIds,samples),'분류 모델의 ID 또는 샘플 구성이 올바르지 않습니다.');
-      weights=decodeFloats(p.classifier.weights,weightCount(p.classIds.length));
-    }
-    return {classIds:p.classIds,samples,settings:p.settings,weights};
-  }
-  const api={ENGINE,SETTINGS,MAX_CLASSES,MAX_PER_CLASS,MAX_SAMPLES,MIN_SAMPLES,MAX_BYTES,FEATURES,DENSE_UNITS,validFeatures,hasPerson,counts,trainable,encodeFloats,decodeFloats,weightCount,serialize,parse};
-  root.PoseModel=api;if(typeof module!=='undefined'&&module.exports)module.exports=api;
-})(typeof globalThis!=='undefined'?globalThis:window);
-
+ 'use strict';
+ const JOINTS=[0,11,12,13,14,15,16,23,24,25,26,27,28], FEATURES=JOINTS.length*3;
+ const FORMAT='boundaryx-mediapipe-pose-knn', VERSION=1;
+ const counts=samples=>samples.reduce((out,s)=>(out[s.label]=(out[s.label]||0)+1,out),{});
+ function validFeatures(f){return f&&f.length===FEATURES&&Array.from(f).every(Number.isFinite)&&JOINTS.every((_,i)=>f[i*3+2]>=0&&f[i*3+2]<=1);}
+ function extract(points){
+   const visible=p=>p&&Number.isFinite(p.x)&&Number.isFinite(p.y)&&p.x>=0&&p.x<=1&&p.y>=0&&p.y<=1&&(p.visibility??0)>=.6;
+   if(!points||!visible(points[11])||!visible(points[12]))return null;
+   const a=points[11],b=points[12],cx=(a.x+b.x)/2,cy=(a.y+b.y)/2;
+   // Inference frames are 4:3. Correct normalized coordinates for aspect ratio.
+   const scale=Math.hypot((a.x-b.x)*4/3,a.y-b.y);
+   if(scale<.045)return null;
+   const f=new Float32Array(FEATURES);let seen=0;
+   JOINTS.forEach((j,i)=>{const p=points[j];if(visible(p)){f[i*3]=(p.x-cx)*4/3/scale;f[i*3+1]=(p.y-cy)/scale;f[i*3+2]=p.visibility;seen++;}});
+   // Shoulders anchor the coordinates; any additional reliable landmark adds
+   // pose information. Wrists/elbows are not mandatory for a cropped upper body.
+   return seen>=3?f:null;
+ }
+ function distance(a,b){
+   let sum=0,weight=0,common=0,reference=0,union=0;
+   for(let i=0;i<FEATURES;i+=3){if(b[i+2]>=.6)reference++;if(a[i+2]>=.6||b[i+2]>=.6)union++;if(a[i+2]<.6||b[i+2]<.6)continue;const w=Math.min(a[i+2],b[i+2]);sum+=w*((a[i]-b[i])**2+(a[i+1]-b[i+1])**2);weight+=w;common++;}
+   const shared=j=>{const i=JOINTS.indexOf(j)*3;return a[i+2]>=.6&&b[i+2]>=.6;};
+   if(!shared(11)||!shared(12)||common<3||common<Math.ceil(reference*.75))return Infinity;
+   // A neutral, cropped sample must not win solely because its shoulders match
+   // every raised-arm pose. Treat missing/visible landmark differences as evidence.
+   return Math.sqrt(sum/weight)+.8*(1-common/union);
+ }
+ function predict(features,samples){
+   const total=counts(samples),neighbors=samples.filter(s=>total[s.label]>=10).map(s=>({label:s.label,d:distance(features,s.features)})).sort((a,b)=>a.d-b.d);
+   if(!neighbors.length||neighbors[0].d>.4)return null;
+   const votes=new Map();for(const n of neighbors.slice(0,5)){if(n.d>.4)continue;votes.set(n.label,(votes.get(n.label)||0)+1/(.05+n.d));}
+   const ranked=[...votes].sort((a,b)=>b[1]-a[1]);if(!ranked.length)return null;
+   const confidence=ranked[0][1]/[...votes.values()].reduce((a,b)=>a+b,0);
+   const competitor=neighbors.find(n=>n.label!==ranked[0][0]);
+   if(confidence<.65||(competitor&&competitor.d-neighbors[0].d<.04))return null;
+   return {label:ranked[0][0],confidence};
+ }
+ function serialize(ids,samples,isFlipped){return {format:FORMAT,version:VERSION,engine:'pose_landmarker_lite',features:'shoulder-normalized-2d-mask-v1',classIds:ids,samples:samples.map(s=>({label:s.label,features:Array.from(s.features)})),settings:{isFlipped}};}
+ function parse(text){
+   const p=JSON.parse(text),fail=m=>{throw Error(m)};
+   if(p.format!==FORMAT||p.version!==VERSION||p.features!=='shoulder-normalized-2d-mask-v1')fail('이 파일은 MediaPipe KNN 포즈 파일이 아닙니다. 기존 PoseNet 샘플은 다시 수집해주세요.');
+   if(!Array.isArray(p.classIds)||p.classIds.length>20||new Set(p.classIds).size!==p.classIds.length||p.classIds.some(id=>typeof id!=='string'||!/^ID[1-9]\d{0,5}$/.test(id)))fail('ID 형식이 올바르지 않습니다.');
+   if(!Array.isArray(p.samples)||p.samples.length>500)fail('샘플 수가 올바르지 않습니다.');
+   for(const s of p.samples)if(!s||!p.classIds.includes(s.label)||!validFeatures(s.features)||s.features.some(v=>Math.abs(v)>100))fail('샘플 데이터가 올바르지 않습니다.');
+   if(Object.values(counts(p.samples)).some(n=>n>100))fail('ID당 최대 100개까지 가져올 수 있습니다.');
+   return {classIds:p.classIds,samples:p.samples.map(s=>({label:s.label,features:new Float32Array(s.features)})),settings:{isFlipped:p.settings?.isFlipped!==false}};
+ }
+ const api={JOINTS,FEATURES,MAX_CLASSES:20,MAX_PER_CLASS:100,MAX_SAMPLES:500,MAX_BYTES:4*1024*1024,counts,validFeatures,extract,distance,predict,serialize,parse};
+ root.PoseModel=api;if(typeof module!=='undefined')module.exports=api;
+})(globalThis);

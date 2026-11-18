@@ -1,3 +1,11 @@
+# Current runtime — v2.0.0
+
+The app loads MediaPipe Tasks Vision and Pose Landmarker Lite from upstream distribution endpoints. See [MediaPipe source and license](https://github.com/google-ai-edge/mediapipe) and [model documentation](https://ai.google.dev/edge/mediapipe/solutions/vision/pose_landmarker). p5.js and Pretendard remain externally loaded; their upstream terms apply.
+
+The historical TensorFlow/Teachable Machine notices below are retained for earlier releases. Those packages are no longer loaded by v2.0.0.
+
+---
+
 # Third-party runtime notices
 
 pose-runtime.js bundles @teachablemachine/pose 0.8.6, TensorFlow.js 4.22.0 and PoseNet 2.2.2, with their transitive runtime dependencies. Source copyright and third-party license notices are preserved at the end of the generated bundle by esbuild legal-comments=eof. package-lock.json records exact packages.
